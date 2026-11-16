@@ -1,147 +1,128 @@
-# Système de Gestion des Projets de Fin d'Études (PFE)
+# Academic Project Management System (Gestion PFE)
 
 [![Java](https://img.shields.io/badge/Java-17%20%7C%208+-ED8B00?logo=openjdk&logoColor=white)](https://www.oracle.com/java/)
-[![Swing](https://img.shields.io/badge/GUI-Java%20Swing-blue)](https://docs.oracle.com/javase/tutorial/uiswing/)
+[![Swing](https://img.shields.io/badge/GUI-Java%20Swing-3776AB)](https://docs.oracle.com/javase/tutorial/uiswing/)
 [![MySQL](https://img.shields.io/badge/Database-MySQL%208.0-4479A1?logo=mysql&logoColor=white)](https://www.mysql.com/)
-[![Maven](https://img.shields.io/badge/Build-Maven-C71A36?logo=apachemaven&logoColor=white)](https://maven.apache.org/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-> **Application bureautique de gestion académique des Projets de Fin d'Études (PFE), soutenances, étudiants et encadreurs.**  
-> Conçue avec une architecture modulaire **MVC / DAO** en Java Swing avec persistance relationnelle MySQL via JDBC.
+Desktop application developed in Java Swing and JDBC to manage the academic lifecycle of final-year engineering projects (PFE: *Projets de Fin d'Études*), defense hearings, students, and academic supervisors.
 
----
+*Note: Pour la documentation en français, voir [README.fr.md](README.fr.md).*
 
-## 📌 Présentation du Projet
+## Architecture and Design
 
-Cette application offre une interface graphique complète permettant aux départements universitaires d'automatiser et de centraliser le cycle de vie complet des Projets de Fin d'Études :
-- Inscription et suivi des **Étudiants**.
-- Gestion du corps des **Encadreurs universitaires**.
-- Attribution et suivi de l'état des **Sujets de PFE** (*Proposé*, *En cours*, *Validé*, *Soutenu*).
-- Planification rigoureuse des **Soutenances** (Date, Heure, Salle, Jury, Note finale et Mention).
+The application follows the **DAO (Data Access Object)** pattern to decouple the Swing user interface from the relational persistence layer.
 
----
+- **Presentation Layer**: Custom Java Swing GUI (`JFrame`, `JTable`, `DefaultTableModel`, modal dialogs) organized into domain frames (`EtudiantFrame`, `EncadreurFrame`, `PfeFrame`, `SoutenanceFrame`, `DashboardFrame`).
+- **Persistence Layer**: Data access objects (`EtudiantDao`, `EncadreurDao`, `PfeDao`, `SoutenanceDao`) executing parameterized SQL statements to safeguard against SQL injection.
+- **Database Connection**: Direct JDBC connection management via `DriverManager.getConnection()`, reading connection parameters from `src/main/resources/db.properties` at runtime.
 
-## 🏗️ Architecture Technique
-
-Le projet adopte le patron de conception **DAO (Data Access Object)** garantissant un découplage propre entre l'interface utilisateur, la logique métier et la couche de données.
-
-```
-src/main/java/tn/pfe/gestion/
-├── App.java                     # Point d'entrée de l'application
-├── db/
-│   └── DbConnection.java        # Gestionnaire de pool/connexions Singleton JDBC
-├── model/
-│   ├── Etudiant.java            # Entité Étudiant
-│   ├── Encadreur.java           # Entité Encadreur
-│   ├── Pfe.java                 # Entité Sujet PFE
-│   ├── PfeEtat.java             # Énumération des états PFE
-│   └── Soutenance.java          # Entité Soutenance & Jury
-├── dao/
-│   ├── EtudiantDao.java         # Opérations CRUD Étudiants
-│   ├── EncadreurDao.java        # Opérations CRUD Encadreurs
-│   ├── PfeDao.java              # Opérations CRUD & filtres PFE
-│   └── SoutenanceDao.java       # Opérations CRUD & vérifications Soutenances
-├── ui/
-│   ├── MainMenuFrame.java       # Menu principal du tableau de bord
-│   ├── EtudiantFrame.java       # Formulaire & table des étudiants
-│   ├── EncadreurFrame.java      # Formulaire & table des encadreurs
-│   ├── PfeFrame.java            # Formulaire d'affectation des PFE
-│   └── SoutenanceFrame.java     # Planification des jurys et soutenances
-└── util/
-    ├── Constants.java
-    ├── ErrorHandler.java
-    └── Validators.java
-```
-
----
-
-## 🗄️ Schéma de la Base de Données
-
-Le schéma relationnel est optimisé avec intégrité référentielle (`FOREIGN KEY` avec contraintes `ON DELETE CASCADE / SET NULL`) :
+## Domain Model and Schema
 
 ```mermaid
 erDiagram
-    ETUDIANT ||--o| PFE : "réalise"
-    ENCADREUR ||--o{ PFE : "encadre"
-    PFE ||--o| SOUTENANCE : "fait l'objet de"
+    ETUDIANT ||--|| PFE : "undertakes (1:1)"
+    PFE }|--|{ ENCADREUR : "supervised via pfe_encadreur (M:N)"
+    PFE ||--o| SOUTENANCE : "evaluated via (1:0..1)"
 
     ETUDIANT {
-        int id PK
-        string matricule UK
+        int id_etudiant PK
         string nom
         string prenom
-        string email
-        string filiere
+        string email UK
+        string classe
     }
     ENCADREUR {
-        int id PK
+        int id_encadreur PK
         string nom
         string prenom
-        string email
         string grade
-        string departement
+        string email UK
     }
     PFE {
-        int id PK
+        int id_pfe PK
         string titre
         string description
-        string entreprise
-        string etat
-        int etudiant_id FK
-        int encadreur_id FK
+        string etat "EN_COURS | VALIDE | SOUTENU | REFUSE"
+        date date_soutenance
+        int id_etudiant FK,UK
+    }
+    PFE_ENCADREUR {
+        int id_pfe PK,FK
+        int id_encadreur PK,FK
     }
     SOUTENANCE {
-        int id PK
-        int pfe_id FK
-        date date_soutenance
+        int id_soutenance PK
+        datetime date
         string salle
-        string president_jury
-        float note
-        string mention
+        decimal note
+        int id_pfe FK,UK
     }
 ```
 
-Les scripts d'initialisation et d'amorçage sont fournis dans le dossier `database/` :
-- `database/schema.sql` : Création des tables et index.
-- `database/seed_data.sql` : Jeu de données de test complet.
+### Lifecycle States
 
----
+Project status (`PfeEtat`) transitions through four distinct states:
+- `EN_COURS`: Project initiated and currently being developed.
+- `VALIDE`: Deliverables approved by supervisor, ready for defense scheduling.
+- `SOUTENU`: Defense hearing completed and final grade recorded.
+- `REFUSE`: Project rejected or requiring substantial restructuring.
 
-## 🚀 Installation & Démarrage
+## Repository Structure
 
-### 1. Prérequis
-- **JDK 17** (ou JDK 8+)
-- **Apache Maven 3.8+**
-- **MySQL Server 8.0+**
-
-### 2. Configuration de la Base de Données
-Créez la base de données et exécutez les scripts SQL :
-```bash
-mysql -u root -p -e "CREATE DATABASE IF NOT EXISTS gestion_pfe CHARACTER SET utf8mb4;"
-mysql -u root -p gestion_pfe < database/schema.sql
-mysql -u root -p gestion_pfe < database/seed_data.sql
+```
+gestion-pfe/
+├── .gitignore
+├── LICENSE
+├── README.md
+├── README.fr.md
+├── pom.xml
+├── schema.sql
+├── seed_data.sql
+└── src/
+    └── main/
+        ├── java/tn/pfe/gestion/
+        │   ├── dao/
+        │   ├── db/
+        │   ├── model/
+        │   └── ui/
+        └── resources/
+            └── db.properties.example
 ```
 
-Ajustez les identifiants de connexion dans `src/main/resources/db.properties` si nécessaire :
-```properties
-db.url=jdbc:mysql://localhost:3306/gestion_pfe?useSSL=false&serverTimezone=UTC
-db.user=root
-db.password=
-```
+## Getting Started
 
-### 3. Compilation et Exécution avec Maven
+### Prerequisites
+
+- Java Development Kit (JDK 8 or 17+)
+- Apache Maven 3.8+
+- MySQL Server 8.0+
+
+### Database Setup
+
+1. Create the database and tables:
+   ```bash
+   mysql -u root -p < schema.sql
+   ```
+2. (Optional) Load seed test data:
+   ```bash
+   mysql -u root -p < seed_data.sql
+   ```
+3. Configure credentials:
+   Copy `src/main/resources/db.properties.example` to `src/main/resources/db.properties` and fill in your local MySQL credentials:
+   ```properties
+   db.url=jdbc:mysql://localhost:3306/gestion_pfe?useSSL=false&serverTimezone=UTC
+   db.user=your_mysql_username
+   db.password=your_mysql_password
+   ```
+
+### Build and Run
+
 ```bash
-# Compiler le projet
 mvn clean compile
-
-# Lancer l'application Swing
-mvn exec:java
+mvn exec:java -Dexec.mainClass="tn.pfe.gestion.Main"
 ```
 
----
+## License
 
-## 👩‍💻 Auteur
-**Isra El Amri**  
-Élève-Ingénieure en Ingénierie Mathématique & Modélisation — ENSIT  
-Passionnée d'IA, Science des Données & Génie Logiciel  
-Contact : [elamriisra3@gmail.com](mailto:elamriisra3@gmail.com)
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
